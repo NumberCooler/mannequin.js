@@ -21,24 +21,47 @@
 const MANNEQUIN_VERSION = 4.02;
 
 
-function createScene()
+function createRenderer(canvas) {
+
+	renderer = new THREE.WebGLRenderer({antialias:true,canvas});
+	
+	//renderer.domElement.style = 'width:100%; height:100%; position:fixed; top:0; left:0; z-index:-1;';
+	renderer.shadowMap.enabled = true;
+	renderer.setAnimationLoop(drawFrame);
+	//document.body.appendChild( renderer.domElement );
+
+	clock = new THREE.Clock();
+
+	var events = null;
+	if(Class) {
+		events = Class.create("WithEvents"); // from https://github.com/NumberCooler/SPA2/blob/master/core.js
+	}
+
+	function drawFrame()
+	{
+		if(events) events.emit("drawFrame",[renderer,100*clock.getElapsedTime()]);
+		//renderer.render( scene, camera );
+	}
+
+	return {
+		renderer,
+		events
+	}
+
+}
+
+
+function createScene(renderer, events, size)
 {
-	renderer = new THREE.WebGLRenderer({antialias:true});
-		renderer.setSize( window.innerWidth, window.innerHeight );
-		renderer.domElement.style = 'width:100%; height:100%; position:fixed; top:0; left:0; z-index:-1;';
-		renderer.shadowMap.enabled = true;
-		renderer.setAnimationLoop(drawFrame);
-		document.body.appendChild( renderer.domElement );
 
-
+	//console.error(size);
+	renderer.setSize( size[0], size[1] );
 	scene = new THREE.Scene();
 		scene.background = new THREE.Color('gainsboro');
 		scene.fog = new THREE.Fog('gainsboro',100,600);
-
-
-	camera = new THREE.PerspectiveCamera( 30, window.innerWidth/window.innerHeight, 0.1, 2000 );
-		camera.position.set(0,0,150);
 	
+	camera = new THREE.PerspectiveCamera( 30, size[0]/size[1], 0.1, 2000 );
+		camera.position.set(0,0,300);
 	
 	var light = new THREE.PointLight('white',0.5);
 		light.position.set(0,100,50);
@@ -46,11 +69,19 @@ function createScene()
 		light.shadow.mapSize.height = 1024;	
 		light.castShadow = true;
 		scene.add( light, new THREE.AmbientLight('white',0.5) );
-	
-	
+
+	function onWindowResize( event )
+	{
+		if(events) {
+			events.emit("resize");
+		} else {
+			camera.aspect = size[0] / size[1];
+			camera.updateProjectionMatrix();
+			renderer.setSize( size[0], size[1], true );
+		}
+	}
 	window.addEventListener( 'resize', onWindowResize, false );
 	onWindowResize();
-	
 
 	var ground = new THREE.Mesh(
 			new THREE.BoxGeometry(1000,1,1000),
@@ -59,30 +90,13 @@ function createScene()
 		ground.receiveShadow = true;
 		ground.position.y = -30;
 		scene.add( ground );
-
 	
-	clock = new THREE.Clock();
-}
-
-
-function onWindowResize( event )
-{
-	camera.aspect = window.innerWidth / window.innerHeight;
-	camera.updateProjectionMatrix();
-
-	renderer.setSize( window.innerWidth, window.innerHeight, true );
-}
-
-
-function drawFrame()
-{
-	animate(100*clock.getElapsedTime());
-	renderer.render( scene, camera );
-}
-
-
-function animate()
-{
+	return {
+		scene,
+		camera,
+		light,
+		size
+	};
 }
 
 	
@@ -280,7 +294,7 @@ class TorsoShape extends ParametricShape
 // flexible joint
 class Joint extends THREE.Group
 {
-	constructor(parentJoint,pos,rot,params,shape)
+	constructor(scene,parentJoint,pos,rot,params,shape)
 	{
 		super();
 		var y = params[1];
@@ -434,36 +448,36 @@ class Joint extends THREE.Group
 
 class Pelvis extends Joint
 {
-	constructor(parentJoint)
+	constructor(scene,parentJoint)
 	{
-		super(parentJoint,null,[0,0,-20],[3,4,parentJoint.feminine?5.5:5],PelvisShape);
+		super(scene,parentJoint,null,[0,0,-20],[3,4,parentJoint.feminine?5.5:5],PelvisShape);
 	}
 }
 
 
 class Torso extends Joint
 {
-	constructor(parentJoint)
+	constructor(scene,parentJoint)
 	{
-		super(parentJoint,[-2,4,0],[0,0,20],[5,17,10,parentJoint.feminine?10:80,parentJoint.feminine?520:380,parentJoint.feminine?0.8:0.9,parentJoint.feminine?0.25:0.2],TorsoShape);
+		super(scene,parentJoint,[-2,4,0],[0,0,20],[5,17,10,parentJoint.feminine?10:80,parentJoint.feminine?520:380,parentJoint.feminine?0.8:0.9,parentJoint.feminine?0.25:0.2],TorsoShape);
 	}
 }
 
 
 class Neck extends Joint
 {
-	constructor(parentJoint)
+	constructor(scene,parentJoint)
 	{
-		super(parentJoint,[0,15,0],[0,0,10],[2,parentJoint.feminine?5:4,2,45,60,1,0.2,0],LimbShape);
+		super(scene,parentJoint,[0,15,0],[0,0,10],[2,parentJoint.feminine?5:4,2,45,60,1,0.2,0],LimbShape);
 	}
 }
 
 
 class Head extends Joint
 {
-	constructor(parentJoint)
+	constructor(scene,parentJoint)
 	{
-		super(parentJoint,[1,3,0],null,[3,4,2.5],HeadShape);
+		super(scene,parentJoint,[1,3,0],null,[3,4,2.5],HeadShape);
 	}
 	
 	nod(angle)
@@ -482,9 +496,9 @@ class Head extends Joint
 
 class Leg extends Joint
 {
-	constructor(parentJoint,leftOrRight)
+	constructor(scene,parentJoint,leftOrRight)
 	{
-		super(parentJoint,[0,-3,4*leftOrRight],[0,180,200],[4,15,4,-70,220,1,0.4,2],LimbShape);
+		super(scene,parentJoint,[0,-3,4*leftOrRight],[0,180,200],[4,15,4,-70,220,1,0.4,2],LimbShape);
 		this.leftOrRight = leftOrRight;
 	}
 	
@@ -510,9 +524,9 @@ class Leg extends Joint
 
 class Knee extends Joint
 {
-	constructor(parentJoint)
+	constructor(scene,parentJoint)
 	{
-		super(parentJoint,null,null,[4,14,4,-40,290,0.65,0.25,1.5],LimbShape);
+		super(scene,parentJoint,null,null,[4,14,4,-40,290,0.65,0.25,1.5],LimbShape);
 	}
 	
 	bend(angle)
@@ -525,9 +539,9 @@ class Knee extends Joint
 
 class Ankle extends Joint
 {
-	constructor(parentJoint)
+	constructor(scene,parentJoint)
 	{
-		super(parentJoint,null,[0,0,-90],[1,4,2],ShoeShape);
+		super(scene,parentJoint,null,[0,0,-90],[1,4,2],ShoeShape);
 	}
 	
 	turn(angle,leftOrRight=this.parentJoint.parentJoint.leftOrRight)
@@ -546,9 +560,9 @@ class Ankle extends Joint
 
 class Arm extends Joint
 {
-	constructor(parentJoint,leftOrRight)
+	constructor(scene,parentJoint,leftOrRight)
 	{
-		super(parentJoint,[0,14,leftOrRight*(parentJoint.feminine?5:6)],[-leftOrRight*10,leftOrRight*180,-leftOrRight*180],[3.5,11,2.5,-90,360,0.9,0.2,1.5],LimbShape);
+		super(scene,parentJoint,[0,14,leftOrRight*(parentJoint.feminine?5:6)],[-leftOrRight*10,leftOrRight*180,-leftOrRight*180],[3.5,11,2.5,-90,360,0.9,0.2,1.5],LimbShape);
 		this.leftOrRight = leftOrRight;
 	}
 	
@@ -574,18 +588,18 @@ class Arm extends Joint
 
 class Elbow extends Joint
 {
-	constructor(parentJoint)
+	constructor(scene,parentJoint)
 	{
-		super(parentJoint,null,null,[2.5,9,2,-40,150,0.5,0.45,1.1],LimbShape);
+		super(scene,parentJoint,null,null,[2.5,9,2,-40,150,0.5,0.45,1.1],LimbShape);
 	}
 }
 
 
 class Wrist extends Joint
 {
-	constructor(parentJoint)
+	constructor(scene,parentJoint)
 	{
-		super(parentJoint,null,null,[1.2,2,3.5,-90,45,0.5,0.3,1/2],LimbShape);
+		super(scene,parentJoint,null,null,[1.2,2,3.5,-90,45,0.5,0.3,1/2],LimbShape);
 	}
 	
 	turn(angle,leftOrRight=this.parentJoint.parentJoint.leftOrRight)
@@ -604,9 +618,9 @@ class Wrist extends Joint
 
 class Phalange extends Joint
 {
-	constructor(parentJoint,params)
+	constructor(scene,parentJoint,params)
 	{
-		super(parentJoint,null,null,params,LimbShape);
+		super(scene,parentJoint,null,null,params,LimbShape);
 	}
 	
 }
@@ -614,11 +628,11 @@ class Phalange extends Joint
 
 class Fingers extends Phalange
 {
-	constructor(parentJoint)
+	constructor(scene,parentJoint)
 	{
-		super(parentJoint,[1.2,1.5,3.5,0,45,0.3,0.4,0.2]);
+		super(scene,parentJoint,[1.2,1.5,3.5,0,45,0.3,0.4,0.2]);
 		
-		this.tips = new Phalange(this,[1.2,1,3.5,45,45,0.3,0.4,0.2]);
+		this.tips = new Phalange(scene,this,[1.2,1,3.5,45,45,0.3,0.4,0.2]);
 	}
 	
 	_turn()
@@ -631,45 +645,48 @@ class Fingers extends Phalange
 
 class Mannequin extends Joint
 {
-	constructor(feminine,height=1)
+	constructor(scene,feminine,height=1)
 	{
-		super(null,null,null,[1,1,1],THREE.Group);
-	
+		console.log("A1");
+		super(scene,null,null,null,[1,1,1],THREE.Group);
+		console.log("A2");
 		this.scale.set( height, height, height );
-		
 		this.feminine = feminine;
-		
-		this.pelvis = new Pelvis(this);
-			this.torso = new Torso(this.pelvis);
-			this.neck = new Neck(this.torso);
-			this.head = new Head(this.neck);
-			
-		this.l_leg = new Leg(this.pelvis,LEFT);
-			this.l_knee = new Knee(this.l_leg);
-			this.l_ankle = new Ankle(this.l_knee);
-			
-		this.r_leg = new Leg(this.pelvis,RIGHT);
-			this.r_knee = new Knee(this.r_leg);
-			this.r_ankle = new Ankle(this.r_knee);
-			
-		this.l_arm = new Arm(this.torso,LEFT);
-			this.l_elbow = new Elbow(this.l_arm);
-			this.l_wrist = new Wrist(this.l_elbow);
-			this.l_fingers = new Fingers(this.l_wrist);
-			
-		this.r_arm = new Arm(this.torso,RIGHT);
-			this.r_elbow = new Elbow(this.r_arm);
-			this.r_wrist = new Wrist(this.r_elbow);
-			this.r_fingers = new Fingers(this.r_wrist);
 
+		this.pelvis = new Pelvis(scene,this);
+		
+			this.torso = new Torso(scene,this.pelvis);
+			this.neck = new Neck(scene,this.torso);
+			this.head = new Head(scene,this.neck);
+		
+		this.l_leg = new Leg(scene,this.pelvis,LEFT);
+			this.l_knee = new Knee(scene,this.l_leg);
+			this.l_ankle = new Ankle(scene,this.l_knee);
+		
+		this.r_leg = new Leg(scene,this.pelvis,RIGHT);
+			this.r_knee = new Knee(scene,this.r_leg);
+			this.r_ankle = new Ankle(scene,this.r_knee);
+		console.log("A2.1");		
+		this.l_arm = new Arm(scene,this.torso,LEFT);
+		
+			this.l_elbow = new Elbow(scene,this.l_arm);
+			
+			this.l_wrist = new Wrist(scene,this.l_elbow);
+			console.log("A2.2");	
+			this.l_fingers = new Fingers(scene,this.l_wrist);
+			console.log("A2.22");	
+			
+		this.r_arm = new Arm(scene,this.torso,RIGHT);
+			this.r_elbow = new Elbow(scene,this.r_arm);
+			this.r_wrist = new Wrist(scene,this.r_elbow);
+			this.r_fingers = new Fingers(scene,this.r_wrist);
+		console.log("A3");
 		var s = 1.5/(0.5+height);
 		this.head.scale.set( s, s, s );
 		this.castShadow=true;
 		this.receiveShadow=true;
 		scene.add(this);
 	}
-		
-	
 	_turn()
 	{
 		this.turnJoint(this.tiltAngle,-this.turnAngle,-this.bendAngle,'YXZ');
@@ -679,19 +696,25 @@ class Mannequin extends Joint
 
 class Female extends Mannequin
 {
-	constructor(){super(true,0.95);} 
+	constructor(scene){
+		super(scene,true,0.95);
+	} 
 }
 
 
 class Male extends Mannequin
 {
-	constructor(){super(false);} 
+	constructor(scene){
+		super(scene,false);
+	} 
 }
 
 
 class Child extends Mannequin
 {
-	constructor(){super(false,0.65);} 
+	constructor(scene){
+		super(scene,false,0.65);
+	} 
 }
 
 
