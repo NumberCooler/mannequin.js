@@ -54,7 +54,7 @@ function createRenderer(canvas) {
 function createScene(renderer, events, size)
 {
 
-	//console.error(size);
+	
 	renderer.setSize( size[0], size[1] );
 	scene = new THREE.Scene();
 		scene.background = new THREE.Color('gainsboro');
@@ -109,7 +109,6 @@ function cos(x) {return Math.cos(rad(x));}
 // direction of motion
 const LEFT = -1;
 const RIGHT = 1;
-
 
 // calculate 2cosine-based lump
 // params is array of [ [u-min, u-max, v-min, v-max, 1/height], ...]
@@ -647,9 +646,9 @@ class Mannequin extends Joint
 {
 	constructor(scene,feminine,height=1)
 	{
-		console.log("A1");
+		
 		super(scene,null,null,null,[1,1,1],THREE.Group);
-		console.log("A2");
+		
 		this.scale.set( height, height, height );
 		this.feminine = feminine;
 
@@ -666,21 +665,18 @@ class Mannequin extends Joint
 		this.r_leg = new Leg(scene,this.pelvis,RIGHT);
 			this.r_knee = new Knee(scene,this.r_leg);
 			this.r_ankle = new Ankle(scene,this.r_knee);
-		console.log("A2.1");		
-		this.l_arm = new Arm(scene,this.torso,LEFT);
 		
+		this.l_arm = new Arm(scene,this.torso,LEFT);
 			this.l_elbow = new Elbow(scene,this.l_arm);
-			
 			this.l_wrist = new Wrist(scene,this.l_elbow);
-			console.log("A2.2");	
 			this.l_fingers = new Fingers(scene,this.l_wrist);
-			console.log("A2.22");	
+		
 			
 		this.r_arm = new Arm(scene,this.torso,RIGHT);
 			this.r_elbow = new Elbow(scene,this.r_arm);
 			this.r_wrist = new Wrist(scene,this.r_elbow);
 			this.r_fingers = new Fingers(scene,this.r_wrist);
-		console.log("A3");
+		
 		var s = 1.5/(0.5+height);
 		this.head.scale.set( s, s, s );
 		this.castShadow=true;
